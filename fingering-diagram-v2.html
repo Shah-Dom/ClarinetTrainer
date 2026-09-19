@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Clarinet Fingering Diagrams — Prototype v2</title>
+<title>Clarinet Fingering Diagrams — v2.8</title>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600&family=JetBrains+Mono:wght@400;500;700&display=swap');
 
@@ -72,6 +72,8 @@ header .subtitle{ color: var(--ink-dim); font-size: 11px; letter-spacing: 0.04em
 .staff-note-hit:hover circle{ stroke: var(--silver); }
 .staff-msg{ font-size: 11px; color: var(--warn); margin-top: 6px; min-height: 14px; }
 .note-btn.no-data{ opacity: 0.4; }
+.note-btn.quarter{ border-style: dashed; color: var(--warn); }
+.qt-toggle input{ accent-color: var(--warn); width: 14px; height: 14px; }
 .no-data-msg{
   color: var(--ink-dim); font-size: 12px; line-height: 1.6; max-width: 420px;
   padding: 30px 10px; text-align: center; margin: 0 auto;
@@ -103,7 +105,7 @@ footer{ text-align:center; color: var(--ink-dim); font-size: 11px; margin-top: 2
 <div class="rack">
   <header>
     <h1>Clarinet Fingering Diagrams</h1>
-    <div class="subtitle">Prototype v2.6 - Boehm-system chromatic E3–C7</div>
+    <div class="subtitle">v2.8 - Boehm-system chromatic E3–C7, optional quarter tones</div>
   </header>
 
   <div class="panel" data-label="Select a note">
@@ -115,6 +117,10 @@ footer{ text-align:center; color: var(--ink-dim); font-size: 11px; margin-top: 2
       </div>
     </div>
     <div class="staff-msg" id="staffMsg"></div>
+    <label class="qt-toggle" style="display:flex; align-items:center; gap:8px; margin-top:12px; font-size:12px; color:var(--ink-dim); cursor:pointer;">
+      <input type="checkbox" id="qtToggle">
+      Include quarter tones
+    </label>
     <div class="note-picker" id="notePicker" style="margin-top:14px;"></div>
   </div>
 
@@ -139,127 +145,18 @@ footer{ text-align:center; color: var(--ink-dim); font-size: 11px; margin-top: 2
   <footer>Contact Reza for any suggestions</footer>
 </div>
 
+<script src="fingering-data.js"></script>
+<script src="quarter-tone-data.js"></script>
 <script>
 (() => {
 'use strict';
 
-/* =========================================================
-   DATA — every note maps to an ARRAY of fingerings (not just
-   main/alt). Each fingering is {keys: [...], code, label}.
-   ========================================================= */
-const NOTES = {
-  'E3':  [
-    { code: 'T 123E|123',  keys: ['thumb','lh1','lh2','lh3','lhE','rh1','rh2','rh3'], label: 'use with RH-pinky or no-pinky fingerings' },
-    { code: 'T 123|123E',  keys: ['thumb','lh1','lh2','lh3','rh1','rh2','rh3','rhE'], label: 'use with LH-pinky or no-pinky fingerings' },
-    { code: 'T 123E|123F', keys: ['thumb','lh1','lh2','lh3','lhE','rh1','rh2','rh3','rhF'], label: 'use before F3 or C5' },
-  ],
-  'F3':  [
-    { code: 'T 123|123F', keys: ['thumb','lh1','lh2','lh3','rh1','rh2','rh3','rhF'], label: 'use with LH-pinky fingerings' },
-    { code: 'T 123F|123', keys: ['thumb','lh1','lh2','lh3','lhF','rh1','rh2','rh3'], label: 'use with RH-pinky fingerings' },
-  ],
-  'F#3': [
-    { code: 'T 123F#|123',  keys: ['thumb','lh1','lh2','lh3','lhFSharp','rh1','rh2','rh3'], label: 'use with RH-pinky fingerings' },
-    { code: 'T 123|123F#',  keys: ['thumb','lh1','lh2','lh3','rh1','rh2','rh3','rhFSharp'], label: 'use with LH-pinky fingerings' },
-    { code: 'T 123F#|123F', keys: ['thumb','lh1','lh2','lh3','lhFSharp','rh1','rh2','rh3','rhF'], label: 'use before F3 or C5' },
-  ],
-  'G3':  [ { code: 'T 123|123', keys: ['thumb','lh1','lh2','lh3','rh1','rh2','rh3'], label: 'basic' } ],
-  'G#3': [ { code: 'T 123|123G#', keys: ['thumb','lh1','lh2','lh3','rh1','rh2','rh3','rhGSharp'], label: 'basic' } ],
-  'A3':  [ { code: 'T 123|12-', keys: ['thumb','lh1','lh2','lh3','rh1','rh2'], label: 'basic' } ],
-  'Bb3': [ { code: 'T 123|1--', keys: ['thumb','lh1','lh2','lh3','rh1'], label: 'basic - confirmed as the only fingering in both the basic and alternate charts' } ],
-  'B3':  [
-    { code: 'T 123|-2-', keys: ['thumb','lh1','lh2','lh3','rh2'], label: 'basic' },
-    { code: 'T 123|1-B-', keys: ['thumb','lh1','lh2','lh3','rh1','bottomSliver'], label: 'chromatic, use with Bb3 or F4' },
-  ],
-  'C4':  [ { code: 'T 123|---', keys: ['thumb','lh1','lh2','lh3'], label: 'basic' } ],
-  'C#4': [ { code: 'T 123C#|---', keys: ['thumb','lh1','lh2','lh3','lhCSharp'], label: 'basic' } ],
-  'D4':  [ { code: 'T 12-|---', keys: ['thumb','lh1','lh2'], label: 'basic' } ],
-  'Eb4': [
-    { code: 'T 12-|4---',  keys: ['thumb','lh1','lh2','side4'], label: 'basic' },
-    { code: 'T 12Eb-|---', keys: ['thumb','lh1','lh2','topSliver'], label: 'chromatic/trill, use with D4 and A5' },
-    { code: 'T 1--|1--',   keys: ['thumb','lh1','rh1'], label: 'sharp - use with RH1 fingerings' },
-  ],
-  'E4':  [ { code: 'T 1--|---', keys: ['thumb','lh1'], label: 'basic' } ],
-  'F4':  [ { code: 'T ---|---', keys: ['thumb'], label: 'basic' } ],
-  'F#4': [
-    { code: '1--|---',     keys: ['lh1'], label: 'basic (thumb off)' },
-    { code: 'T ---|34---', keys: ['thumb','side3','side4'], label: 'chromatic, use with F4' },
-  ],
-  'G4':  [ { code: '---|---', keys: [], label: 'basic (open G - no keys at all)' } ],
-  'G#4': [ { code: 'G#---|---', keys: ['throatAb'], label: 'basic' } ],
-  'A4':  [ 
-    { code: 'A---|---', keys: ['throatA'], label: 'basic' },
-    { code: 'A-23|-23F', keys: ['throatA','lh2','lh3','rh2','rh3','rhF'], label: 'Resonant, makes it flatter' },
-  ],
-  'Bb4': [
-    { code: 'R A---|---', keys: ['register','throatA'], label: 'basic' },
-    { code: 'A---|2---',  keys: ['throatA','side2'], label: 'trill fingering with A4' },
-  ],
-  'B4':  [
-    { code: 'RT 123E|123',  keys: ['register','thumb','lh1','lh2','lh3','lhE','rh1','rh2','rh3'], label: 'use with RH-pinky or no-pinky fingerings' },
-    { code: 'RT 123|123E',  keys: ['register','thumb','lh1','lh2','lh3','rh1','rh2','rh3','rhE'], label: 'use with LH-pinky or no-pinky fingerings' },
-    { code: 'RT 123E|123F', keys: ['register','thumb','lh1','lh2','lh3','lhE','rh1','rh2','rh3','rhF'], label: 'use before C5' },
-  ],
-  'C5':  [
-    { code: 'RT 123|123F', keys: ['register','thumb','lh1','lh2','lh3','rh1','rh2','rh3','rhF'], label: 'use with LH-pinky fingerings' },
-    { code: 'RT 123F|123', keys: ['register','thumb','lh1','lh2','lh3','lhF','rh1','rh2','rh3'], label: 'use with RH-pinky fingerings' },
-  ],
-  'C#5': [
-    { code: 'RT 123F#|123',  keys: ['register','thumb','lh1','lh2','lh3','lhFSharp','rh1','rh2','rh3'], label: 'use with RH-pinky fingerings' },
-    { code: 'RT 123|123F#',  keys: ['register','thumb','lh1','lh2','lh3','rh1','rh2','rh3','rhFSharp'], label: 'use with LH-pinky fingerings' },
-    { code: 'RT 123F#|123F', keys: ['register','thumb','lh1','lh2','lh3','lhFSharp','rh1','rh2','rh3','rhF'], label: 'use before C5 range repeats' },
-  ],
-  'D5':  [ { code: 'RT 123|123', keys: ['register','thumb','lh1','lh2','lh3','rh1','rh2','rh3'], label: 'basic' } ],
-  'D#5': [ { code: 'RT 123|123G#', keys: ['register','thumb','lh1','lh2','lh3','rh1','rh2','rh3','rhGSharp'], label: 'basic' } ],
-  'E5':  [ { code: 'RT 123|12-', keys: ['register','thumb','lh1','lh2','lh3','rh1','rh2'], label: 'basic' } ],
-  'F5':  [ { code: 'RT 123|1--', keys: ['register','thumb','lh1','lh2','lh3','rh1'], label: 'basic' } ],
-  'F#5': [
-    { code: 'RT 123|-2-', keys: ['register','thumb','lh1','lh2','lh3','rh2'], label: 'basic' },
-    { code: 'RT 123|1-B-', keys: ['register','thumb','lh1','lh2','lh3','rh1','bottomSliver'], label: 'chromatic, use with Bb4 or F5' },
-    { code: 'RT 123|--3', keys: ['register','thumb','lh1','lh2','lh3','rh3'], label: 'use with D5' },
-  ],
-  'G5':  [ { code: 'RT 123|---', keys: ['register','thumb','lh1','lh2','lh3'], label: 'basic' } ],
-  'G#5': [
-    { code: 'RT 123C#|---', keys: ['register','thumb','lh1','lh2','lh3','lhFSharp'], label: 'basic' },
-    { code: 'RT 12-|12-',   keys: ['register','thumb','lh1','lh2','rh1','rh2'], label: 'use with fingerings involving the right hand fingers' },
-  ],
-  'A5':  [ { code: 'RT 12-|---', keys: ['register','thumb','lh1','lh2'], label: 'basic' } ],
-  'Bb5': [
-    { code: 'RT 12-|4---',  keys: ['register','thumb','lh1','lh2','side4'], label: 'basic' },
-    { code: 'RT 12Eb-|---', keys: ['register','thumb','lh1','lh2','topSliver'], label: 'chromatic/trill, use with D4 and A5' },
-    { code: 'RT 1--|1--',   keys: ['register','thumb','lh1','rh1'], label: 'use with fingerings involving RH1' },
-    { code: 'RT 1--|-2-',   keys: ['register','thumb','lh1','rh2'], label: 'sharp - use for facility with fingerings involving RH2' },
-  ],
-  'B5':  [ { code: 'RT 1--|---', keys: ['register','thumb','lh1'], label: 'basic' } ],
-  'C6':  [
-    { code: 'RT ---|---', keys: ['register','thumb'], label: 'basic - confirmed directly in source (previously marked inferred; that caveat no longer applies)' },
-    { code: 'RT --3|4123', keys: ['register','thumb','lh3','side4','rh1','rh2','rh3'], label: 'useful for pp attacks and upward skips from D5' },
-    { code: 'RT ---|123', keys: ['register','thumb','rh1','rh2','rh3'], label: 'suitable for large interval skips (e.g. with D5) and pp' },
-    { code: 'RT 12Eb-|34---', keys: ['register','thumb','lh1','lh2','topSliver','side3','side4'], label: 'slightly sharp - good for ff, useful with Bb5' },
-  ],
-  'C#6': [ { code: 'RT -23|12-', keys: ['register','thumb','lh2','lh3','rh1','rh2'], label: 'basic' } ],
-  'D6':  [ { code: 'RT -23|1--G#', keys: ['register','thumb','lh2','lh3','rh1','rhGSharp'], label: 'basic' } ],
-  'Eb6': [ { code: 'RT -23|1-B-G#', keys: ['register','thumb','lh2','lh3','rh1','bottomSliver','rhGSharp'], label: 'basic' } ],
-  'E6':  [ { code: 'RT -23|---G#', keys: ['register','thumb','lh2','lh3','rhGSharp'], label: 'basic' } ],
-  'F6':  [ { code: 'RT -23C#|---G#', keys: ['register','thumb','lh2','lh3','lhFSharp','rhGSharp'], label: 'basic' } ],
-  'F#6': [ { code: 'RT -2-|---G#', keys: ['register','thumb','lh2','rhGSharp'], label: 'basic' } ],
-  'G6':  [ { code: 'RT -2-|12-G#', keys: ['register','thumb','lh2','rh1','rh2','rhGSharp'], label: 'basic' } ],
-  'G#6': [ { code: 'RT -23F#|1-3', keys: ['register','thumb','lh2','lh3','lhFSharp','rh1','rh3'],
-    label: 'first-listed of several documented options - upper altissimo has no single "basic" fingering, this register is genuinely instrument/player-dependent' } ],
-  'A6':  [ { code: 'RT -23|---F', keys: ['register','thumb','lh2','lh3','rhF'],
-    label: 'first-listed of several documented options - see note above' } ],
-  'Bb6': [ { code: 'RT G#-23C#|---G#', keys: ['register','thumb','leftSideGSharp','lh2','lh3','lhFSharp','rhGSharp'],
-    label: 'first-listed of several documented options - see note above' } ],
-  'B6':  [ { code: 'RT G#12-|12-', keys: ['register','thumb','leftSideGSharp','lh1','lh2','rh1','rh2'],
-    label: 'first-listed of several documented options - see note above' } ],
-  'C7':  [ { code: 'RT G#1--|1--F#', keys: ['register','thumb','leftSideGSharp','lh1','rh1','rhFSharp'],
-    label: 'first-listed of several documented options - see note above' } ],
-};
-const NOTE_ORDER = ['E3','F3','F#3','G3','G#3','A3','Bb3','B3','C4','C#4','D4','Eb4','E4','F4','F#4','G4','G#4','A4','Bb4','B4','C5','C#5','D5',
+const NOTE_ORDER = ['E3','F3','F#3','G3','G#3','A3','Bb3','B3','C4','C#4','D4','Eb4','E4','F4','F#4','G4','G#4','A4','Bb4','B4','C5','C#5','D5', 'D#5',
   'E5','F5','F#5','G5','G#5','A5','Bb5','B5','C6','C#6','D6','Eb6','E6','F6','F#6','G6'];
 const NATURALS = new Set(['E3','F3','G3','A3','B3','C4','D4','E4','F4','G4','A4','B4','C5','D5','E5','F5','G5','A5','B5','C6','D6','E6','F6','G6']);
 
 const CHROMATIC_LETTERS = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
-const FLAT_SPELLING_OVERRIDES = { 'A#3': 'Bb3', 'D#4': 'Eb4', 'A#4': 'Bb4', 'A#5': 'Bb5', 'D#6': 'Eb6', 'A#6': 'Bb6' };
+const FLAT_SPELLING_OVERRIDES = { 'A#3': 'Bb3', 'D#4': 'Eb4', 'A#4': 'Bb4', 'A#5': 'Bb5', 'D#5': 'Eb5', 'D#6': 'Eb6', 'A#6': 'Bb6' };
 function chromaticIndex(label){
   const m = /^([A-G]#?)(\d+)$/.exec(label);
   return parseInt(m[2], 10) * 12 + CHROMATIC_LETTERS.indexOf(m[1]);
@@ -344,23 +241,82 @@ function buildDiagramSvg(pressedList){
 /* =========================================================
    UI WIRING
    ========================================================= */
+
+/* Quarter-tone glyphs for display only - the data keys (and all
+   lookups) keep the plain +/- from quarter-tone-data.js. */
+const QT_SHARP_GLYPH = String.fromCodePoint(119090); // U+1D132 sori / quarter-tone sharp
+const QT_FLAT_GLYPH  = String.fromCodePoint(119091); // U+1D133 koron / quarter-tone flat
+function quarterToneDisplayLabel(name){
+  const m = /^([A-G])([+-])(\d+)$/.exec(name);
+  if (!m) return name;
+  const glyph = m[2] === '+' ? QT_SHARP_GLYPH : QT_FLAT_GLYPH;
+  return m[1] + glyph + m[3];
+}
+
+// Map each full-note label to the quarter tone that immediately follows it
+// in pitch order, so the picker can interleave them in the right spot.
+// '<letter>+<octave>' sits right after that natural; '<letter>-<octave>'
+// sits right after whatever note precedes that natural.
+const QUARTER_TONE_AFTER = {};
+if (typeof QUARTER_TONES !== 'undefined'){
+  Object.keys(QUARTER_TONES).forEach(name => {
+    const m = /^([A-G])([+-])(\d+)$/.exec(name);
+    if (!m) return;
+    const anchor = m[1] + m[3];
+    if (m[2] === '+'){
+      QUARTER_TONE_AFTER[anchor] = name;
+    } else {
+      const idx = FULL_NOTE_ORDER.indexOf(anchor);
+      if (idx > 0) QUARTER_TONE_AFTER[FULL_NOTE_ORDER[idx - 1]] = name;
+    }
+  });
+}
+
+function quarterToneHasData(name){
+  const entry = QUARTER_TONES && QUARTER_TONES[name];
+  return !!(entry && entry[0] && entry[0].keys && entry[0].keys.length > 0);
+}
+
 const picker = document.getElementById('notePicker');
-FULL_NOTE_ORDER.forEach(label => {
-  const btn = document.createElement('button');
-  btn.className = 'note-btn ' + (FULL_NATURALS.has(label) ? 'natural' : 'accidental');
-  if (!NOTES[label]) btn.classList.add('no-data');
-  btn.textContent = label;
-  btn.addEventListener('click', () => selectNote(label));
-  btn.id = 'noteBtn-' + label;
-  picker.appendChild(btn);
-});
+const qtToggle = document.getElementById('qtToggle');
+
+function renderNotePicker(){
+  picker.innerHTML = '';
+  const showQuarterTones = qtToggle.checked;
+  FULL_NOTE_ORDER.forEach(label => {
+    const btn = document.createElement('button');
+    btn.className = 'note-btn ' + (FULL_NATURALS.has(label) ? 'natural' : 'accidental');
+    if (!NOTES[label]) btn.classList.add('no-data');
+    btn.textContent = label;
+    btn.addEventListener('click', () => selectNote(label));
+    btn.id = 'noteBtn-' + label;
+    picker.appendChild(btn);
+
+    if (showQuarterTones){
+      const qtName = QUARTER_TONE_AFTER[label];
+      if (qtName){
+        const qtBtn = document.createElement('button');
+        qtBtn.className = 'note-btn quarter';
+        if (!quarterToneHasData(qtName)) qtBtn.classList.add('no-data');
+        qtBtn.textContent = quarterToneDisplayLabel(qtName);
+        qtBtn.title = qtName;
+        qtBtn.addEventListener('click', () => selectNote(qtName));
+        qtBtn.id = 'noteBtn-' + qtName;
+        picker.appendChild(qtBtn);
+      }
+    }
+  });
+}
+qtToggle.addEventListener('change', renderNotePicker);
+renderNotePicker();
 
 function selectNote(label){
   document.querySelectorAll('.note-btn').forEach(b => b.classList.remove('active'));
-  document.getElementById('noteBtn-' + label).classList.add('active');
-  updateStaffHighlight(label);
+  const btn = document.getElementById('noteBtn-' + label);
+  if (btn) btn.classList.add('active');
+  if (NOTES[label] || FULL_NOTE_ORDER.includes(label)) updateStaffHighlight(label);
 
-  const fingerings = NOTES[label];
+  const fingerings = NOTES[label] || (QUARTER_TONES && QUARTER_TONES[label]);
   const area = document.getElementById('diagramArea');
   if (!fingerings){
     area.innerHTML = `<div class="no-data-msg">
@@ -370,9 +326,10 @@ function selectNote(label){
     </div>`;
     return;
   }
+  const captionLabel = /^[A-G][+-]\d+$/.test(label) ? quarterToneDisplayLabel(label) : label;
   area.innerHTML = fingerings.map((f, i) => `
     <div class="diagram-block">
-      <div class="caption">${label}${fingerings.length > 1 ? ' — option ' + (i + 1) : ''}</div>
+      <div class="caption">${captionLabel}${fingerings.length > 1 ? ' — option ' + (i + 1) : ''}</div>
       ${buildDiagramSvg(f.keys)}
       <div class="fingering-code">${f.code}</div>
       <div style="color:var(--ink-dim); font-size:11px; margin-top:6px; max-width:140px; margin-left:auto; margin-right:auto;">${f.label}</div>
